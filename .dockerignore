@@ -1,0 +1,10 @@
+.env
+.env.*
+.git
+**/node_modules
+**/dist
+**/coverage
+.DS_Store
+*.log
+backend/harper
+artifacts

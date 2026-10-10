@@ -1,0 +1,11 @@
+# Integration-test override; does not replace the running app containers.
+services:
+  backend:
+    image: harperchat-backend-tests
+    build:
+      target: backend-build
+    working_dir: /src
+    entrypoint: ["go"]
+    command: ["test", "-v", "./..."]
+    environment:
+      HARPER_STORAGE_TESTS: "1"

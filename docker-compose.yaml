@@ -1,0 +1,105 @@
+name: harperchat
+
+services:
+  backend:
+    build:
+      context: .
+      target: backend
+    environment:
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:?Set DEEPSEEK_API_KEY in .env}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: harper
+      PGDATABASE: harper
+      PGPASSWORD: ${POSTGRES_PASSWORD:-harper-local-dev}
+      PGSSLMODE: disable
+      REDIS_ADDR: redis:6379
+      S3_ENDPOINT: object-storage:8333
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-harper-local}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-harper-local-object-storage}
+      S3_BUCKET: harper-images
+    ports:
+      - "127.0.0.1:4004:4004"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      object-storage:
+        condition: service_healthy
+    init: true
+    security_opt:
+      - no-new-privileges:true
+
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: harper
+      POSTGRES_DB: harper
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-harper-local-dev}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U harper -d harper"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  object-storage:
+    image: chrislusf/seaweedfs:4.48
+    command: ["mini", "-dir=/data"]
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-harper-local}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-harper-local-object-storage}
+      S3_BUCKET: harper-images
+    volumes:
+      - object_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9333/cluster/status"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 15s
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  frontend:
+    build:
+      context: .
+      target: frontend
+    ports:
+      - "127.0.0.1:4003:4003"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  postgres_data:
+  redis_data:
+  object_data:

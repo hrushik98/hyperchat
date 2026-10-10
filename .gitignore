@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+frontend/node_modules/
+frontend/dist/
+backend/harper
+artifacts/
+.DS_Store
+*.log
+*.dump
